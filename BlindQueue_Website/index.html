@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BlindQueue Live Location Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>BlindQueue — Live Location</h1>
+  <p>Phone GPS → Supabase → Live laptop dashboard</p>
+</header>
+<main>
+  <section class="card">
+    <h2 style="margin-top:0">1. Sign in</h2>
+    <p class="small">Use the same account on the Android phone and laptop. Create the account once, then sign in on both devices.</p>
+    <div class="row">
+      <input id="email" type="email" placeholder="Email address" autocomplete="username">
+      <input id="password" type="password" placeholder="Password (at least 6 characters)" autocomplete="current-password">
+      <button id="signupBtn">Create account</button>
+      <button id="loginBtn" class="secondary">Sign in</button>
+      <button id="logoutBtn" class="secondary hidden">Sign out</button>
+    </div>
+    <div id="authStatus" class="status">Add your Supabase project URL and publishable/anon key in this file before using it.</div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">2. Phone tracking controls</h2>
+    <div class="row">
+      <button id="startBtn" disabled>Start GPS tracking</button>
+      <button id="stopBtn" class="stop" disabled>Stop tracking</button>
+      <button id="refreshBtn" class="secondary" disabled>Refresh history</button>
+    </div>
+    <div id="trackingStatus" class="status">Sign in, then press “Start GPS tracking” on the Android phone and allow location permission.</div>
+    <p class="small">This browser version tracks while the page is open and active. It is not a guaranteed all-day background tracker. For screen-off tracking, a native Android app with background-location permission is needed. Only track a person who has explicitly agreed.</p>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">3. Live overview</h2>
+    <div class="stats">
+      <div class="stat"><div class="label">Latest latitude</div><div class="value" id="latValue">—</div></div>
+      <div class="stat"><div class="label">Latest longitude</div><div class="value" id="lonValue">—</div></div>
+      <div class="stat"><div class="label">GPS accuracy</div><div class="value" id="accuracyValue">—</div></div>
+      <div class="stat"><div class="label">Estimated distance today</div><div class="value" id="distanceValue">—</div></div>
+      <div class="stat"><div class="label">Last location update</div><div class="value" id="updatedValue">—</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">4. Live map</h2>
+    <div id="map"></div>
+    <p class="small">Map tiles © OpenStreetMap contributors. GPS accuracy can be lower indoors. Distance is a rough estimate from recorded points, not a precise odometer.</p>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">5. Recent location history</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Latitude</th><th>Longitude</th><th>Accuracy</th></tr></thead>
+        <tbody id="historyBody"><tr><td colspan="4">Sign in to load location history.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
