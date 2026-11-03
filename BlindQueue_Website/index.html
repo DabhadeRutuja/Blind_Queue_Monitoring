@@ -1,73 +1,195 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BlindQueue Live Location Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>BlindQueue | Location Monitor</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
-<header>
-  <h1>BlindQueue — Live Location</h1>
-  <p>Phone GPS → Supabase → Live laptop dashboard</p>
-</header>
-<main>
-  <section class="card">
-    <h2 style="margin-top:0">1. Sign in</h2>
-    <p class="small">Use the same account on the Android phone and laptop. Create the account once, then sign in on both devices.</p>
-    <div class="row">
-      <input id="email" type="email" placeholder="Email address" autocomplete="username">
-      <input id="password" type="password" placeholder="Password (at least 6 characters)" autocomplete="current-password">
-      <button id="signupBtn">Create account</button>
-      <button id="loginBtn" class="secondary">Sign in</button>
-      <button id="logoutBtn" class="secondary hidden">Sign out</button>
-    </div>
-    <div id="authStatus" class="status">Add your Supabase project URL and publishable/anon key in this file before using it.</div>
-  </section>
-
-  <section class="card">
-    <h2 style="margin-top:0">2. Phone tracking controls</h2>
-    <div class="row">
-      <button id="startBtn" disabled>Start GPS tracking</button>
-      <button id="stopBtn" class="stop" disabled>Stop tracking</button>
-      <button id="refreshBtn" class="secondary" disabled>Refresh history</button>
-    </div>
-    <div id="trackingStatus" class="status">Sign in, then press “Start GPS tracking” on the Android phone and allow location permission.</div>
-    <p class="small">This browser version tracks while the page is open and active. It is not a guaranteed all-day background tracker. For screen-off tracking, a native Android app with background-location permission is needed. Only track a person who has explicitly agreed.</p>
-  </section>
-
-  <section class="card">
-    <h2 style="margin-top:0">3. Live overview</h2>
-    <div class="stats">
-      <div class="stat"><div class="label">Latest latitude</div><div class="value" id="latValue">—</div></div>
-      <div class="stat"><div class="label">Latest longitude</div><div class="value" id="lonValue">—</div></div>
-      <div class="stat"><div class="label">GPS accuracy</div><div class="value" id="accuracyValue">—</div></div>
-      <div class="stat"><div class="label">Estimated distance today</div><div class="value" id="distanceValue">—</div></div>
-      <div class="stat"><div class="label">Last location update</div><div class="value" id="updatedValue">—</div></div>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2 style="margin-top:0">4. Live map</h2>
-    <div id="map"></div>
-    <p class="small">Map tiles © OpenStreetMap contributors. GPS accuracy can be lower indoors. Distance is a rough estimate from recorded points, not a precise odometer.</p>
-  </section>
-
-  <section class="card">
-    <h2 style="margin-top:0">5. Recent location history</h2>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Time</th><th>Latitude</th><th>Longitude</th><th>Accuracy</th></tr></thead>
-        <tbody id="historyBody"><tr><td colspan="4">Sign in to load location history.</td></tr></tbody>
-      </table>
-    </div>
-  </section>
-</main>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="js/config.js"></script>
-<script src="js/app.js"></script>
+  <div class="shell">
+    <aside class="sidebar"><a class="brand" href="#"><span class="logo">BQ</span><span><b>BlindQueue</b><small>LOCATION
+            MONITOR</small></span></a>
+      <div class="navtitle">WORKSPACE</div>
+      <a class="nav active" href="#overview">◫ &nbsp; Overview</a><a class="nav" href="#map-section">⌖ &nbsp; Live
+        map</a><a class="nav" href="#visits-section">◷ &nbsp; Today's visits</a><a class="nav" href="#places-section">⌂
+        &nbsp; Saved places</a><a class="nav" href="#history-section">☷ &nbsp; Location history</a>
+      <div class="sidebottom">
+        <div class="privacy"><i></i><span><b>Private monitoring</b><small>Track only with the person's
+              consent.</small></span></div>
+        <div class="account"><span class="avatar">U</span><span class="accounttext"><b id="accountLabel">Not signed
+              in</b><small id="accountSub">Connect your account</small></span><button id="logoutBtn"
+            class="hidden iconbtn">↗</button></div>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">MONITORING CENTER</div>
+          <h1>Location overview</h1>
+          <p>A simple view of the person's daily journey. <span id="todayLabel"></span></p>
+        </div><span class="live">● &nbsp; LIVE DASHBOARD</span>
+      </header>
+      <section class="card auth" id="auth-section">
+        <div class="sectionhead">
+          <div>
+            <div class="eyebrow">ACCOUNT ACCESS</div>
+            <h2>Sign in to your dashboard</h2>
+            <p>Use the same account on the Android phone and laptop.</p>
+          </div><span class="num">01</span>
+        </div>
+        <div class="authrow"><label>Email address<input id="email" type="email" placeholder="you@example.com"
+              autocomplete="username"></label><label>Password<input id="password" type="password"
+              placeholder="At least 6 characters" autocomplete="current-password"></label>
+          <div class="authbuttons"><button id="loginBtn" class="btn primary">Sign in</button><button id="signupBtn"
+              class="btn light">Create account</button></div>
+        </div>
+        <div id="authStatus" class="notice">Add your Supabase URL and publishable/anon key in js/config.js.</div>
+      </section>
+      <section id="overview">
+        <div class="sectionhead spaced">
+          <div>
+            <div class="eyebrow">AT A GLANCE</div>
+            <h2>Today's summary</h2>
+          </div><button id="refreshBtn" class="btn light" disabled>↻ Refresh</button>
+        </div>
+        <div class="metrics">
+          <article class="metric">
+            <div class="metriclabel">Current location <span class="bubble blue">⌖</span></div><strong
+              id="currentPlaceValue" class="metrictext">Waiting for GPS</strong><small id="currentPlaceSub">No recent
+              location</small>
+          </article>
+          <article class="metric">
+            <div class="metriclabel">Distance today <span class="bubble purple">↗</span></div><strong
+              id="distanceValue">—</strong><small>Estimated from GPS points</small>
+          </article>
+          <article class="metric">
+            <div class="metriclabel">Places visited <span class="bubble green">⌂</span></div><strong
+              id="placesCountValue">0</strong><small>Distinct places detected today</small>
+          </article>
+          <article class="metric">
+            <div class="metriclabel">GPS accuracy <span class="bubble amber">◎</span></div><strong
+              id="accuracyValue">—</strong><small id="updatedValue">Last update: —</small>
+          </article>
+        </div>
+      </section>
+      <section class="card tracking">
+        <div class="sectionhead">
+          <div>
+            <div class="eyebrow">PHONE GPS</div>
+            <h2>Tracking controls</h2>
+            <p>Start tracking on the Android phone. Keep this page open while tracking.</p>
+          </div><span id="trackingPill" class="pill">● Not tracking</span>
+        </div>
+        <div class="trackrow"><button id="startBtn" class="btn primary" disabled>▶ Start GPS tracking</button><button
+            id="stopBtn" class="btn danger" disabled>■ Stop tracking</button><span id="trackingStatus">Sign in, then
+            start GPS tracking from the phone.</span></div>
+      </section>
+      <div class="twocol">
+        <section class="card" id="map-section">
+          <div class="sectionhead">
+            <div>
+              <div class="eyebrow">REAL-TIME POSITION</div>
+              <h2>Live map</h2>
+            </div><span class="tag">OpenStreetMap</span>
+          </div>
+          <div id="map"></div>
+          <div class="legend"><span>● Latest location</span><span>━ Recorded route</span></div>
+        </section>
+        <section class="card" id="places-section">
+          <div class="sectionhead">
+            <div>
+              <div class="eyebrow">KNOWN LOCATIONS</div>
+              <h2>Saved places</h2>
+              <p>Save Home, Hospital or another important place.</p>
+            </div>
+          </div>
+          <form id="placeForm" class="placeform"><label>Place name<input id="placeName" placeholder="e.g. Hospital"
+                maxlength="50" required></label>
+            <div class="formrow"><label>Latitude<input id="placeLat" type="number" step="any" placeholder="Latitude"
+                  required></label><label>Longitude<input id="placeLon" type="number" step="any" placeholder="Longitude"
+                  required></label></div>
+            <div class="formrow"><label>Radius (metres)<input id="placeRadius" type="number" min="30" max="1000"
+                  value="100" required></label><button id="useCurrentBtn" class="btn light usecurrent" type="button">Use
+                current GPS</button></div><button id="savePlaceBtn" class="btn primary full" disabled>+ Save
+              place</button>
+          </form>
+          <div id="placesList" class="placeslist">
+            <div class="empty">Sign in to manage saved places.</div>
+          </div>
+        </section>
+      </div>
+      <section class="card" id="visits-section">
+        <div class="sectionhead">
+          <div>
+            <div class="eyebrow">DAILY JOURNEY</div>
+            <h2>Today's visits</h2>
+            <p>Places and estimated time spent at each location.</p>
+          </div><span id="visitDateLabel" class="tag">Today</span>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Place</th>
+                <th>Arrival</th>
+                <th>Departure</th>
+                <th>Time spent</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="visitsBody">
+              <tr>
+                <td colspan="5" class="emptycell">No visit data yet. Start GPS tracking on the phone.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="footnote">Visits are estimates. A stay is confirmed after approximately 5 minutes of stable GPS data.
+        </p>
+      </section>
+      <section class="card" id="history-section">
+        <div class="sectionhead">
+          <div>
+            <div class="eyebrow">RECENT GPS RECORDS</div>
+            <h2>Location history</h2>
+            <p>Latest recorded coordinates from the phone.</p>
+          </div><span class="tag">Latest 30 records</span>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Recorded time</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Accuracy</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr>
+                <td colspan="4" class="emptycell">Sign in to load location history.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <footer>BlindQueue · Location data is sensitive. Keep account access limited to authorized people.</footer>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
 </body>
+
 </html>

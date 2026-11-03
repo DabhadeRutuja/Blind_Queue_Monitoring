@@ -1,26 +1,713 @@
-:root { font-family: Arial, sans-serif; color: #172033; background: #f5f7fb; }
-    * { box-sizing: border-box; }
-    body { margin: 0; }
-    header { background: #132238; color: white; padding: 18px 22px; }
-    header h1 { margin: 0 0 6px; font-size: 1.35rem; }
-    header p { margin: 0; color: #dbe5f3; font-size: .95rem; }
-    main { max-width: 1100px; margin: 18px auto; padding: 0 14px 24px; }
-    .card { background: white; border: 1px solid #dce3ed; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 8px #1720330a; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    input { padding: 11px; border: 1px solid #c5cedb; border-radius: 8px; font-size: 1rem; min-width: 180px; }
-    button { border: 0; border-radius: 8px; padding: 11px 14px; background: #1769d2; color: white; cursor: pointer; font-weight: 600; }
-    button.secondary { background: #e8edf5; color: #172033; }
-    button.stop { background: #b42318; }
-    button:disabled { opacity: .55; cursor: not-allowed; }
-    .status { margin-top: 10px; font-size: .95rem; color: #39465c; overflow-wrap: anywhere; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
-    .stat { background: #f6f8fc; border-radius: 9px; padding: 13px; }
-    .stat .label { color: #526077; font-size: .88rem; margin-bottom: 7px; }
-    .stat .value { font-weight: 700; font-size: 1.15rem; overflow-wrap: anywhere; }
-    #map { height: 390px; border-radius: 10px; border: 1px solid #dce3ed; }
-    .small { color: #526077; font-size: .88rem; line-height: 1.45; }
-    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-    th, td { padding: 9px 7px; border-bottom: 1px solid #e5eaf1; text-align: left; }
-    .table-wrap { overflow-x: auto; }
-    .hidden { display: none; }
-    @media (max-width: 600px) { #map { height: 320px; } input { width: 100%; } }
+* {
+    box-sizing: border-box
+}
+
+:root {
+    --ink: #19263d;
+    --muted: #8491a5;
+    --line: #e8edf4;
+    --blue: #315fce;
+    --bg: #f5f7fb
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px 'DM Sans', sans-serif
+}
+
+button,
+input {
+    font: inherit
+}
+
+button {
+    cursor: pointer
+}
+
+.shell {
+    min-height: 100vh
+}
+
+.sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 238px;
+    background: white;
+    border-right: 1px solid var(--line);
+    padding: 26px 18px;
+    display: flex;
+    flex-direction: column;
+    z-index: 10
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    text-decoration: none;
+    color: var(--ink);
+    padding: 0 7px 38px
+}
+
+.logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+    background: #eaf0ff;
+    color: var(--blue);
+    display: grid;
+    place-items: center;
+    font: 800 16px Manrope
+}
+
+.brand b {
+    display: block;
+    font: 800 16px Manrope
+}
+
+.brand small {
+    display: block;
+    color: #9aa6b7;
+    font-size: 9px;
+    letter-spacing: 1.4px;
+    margin-top: 3px
+}
+
+.navtitle,
+.eyebrow {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    color: #96a3b6
+}
+
+.navtitle {
+    padding: 0 12px 12px
+}
+
+.nav {
+    padding: 12px 13px;
+    margin: 2px 0;
+    border-radius: 9px;
+    color: #718097;
+    text-decoration: none;
+    font-weight: 600
+}
+
+.nav:hover,
+.nav.active {
+    background: #eef3ff;
+    color: var(--blue)
+}
+
+.sidebottom {
+    margin-top: auto
+}
+
+.privacy {
+    display: flex;
+    gap: 10px;
+    padding: 13px;
+    background: #f5f8fc;
+    border-radius: 10px;
+    margin-bottom: 17px
+}
+
+.privacy i {
+    width: 8px;
+    height: 8px;
+    background: #31b77a;
+    border-radius: 50%;
+    margin-top: 4px
+}
+
+.privacy b,
+.privacy small {
+    display: block
+}
+
+.privacy b {
+    font-size: 11px
+}
+
+.privacy small {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px
+}
+
+.account {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border-top: 1px solid var(--line);
+    padding: 16px 3px 0
+}
+
+.avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #e9eef8;
+    color: #4562a1;
+    display: grid;
+    place-items: center;
+    font-weight: 700
+}
+
+.accounttext {
+    min-width: 0;
+    flex: 1
+}
+
+.accounttext b,
+.accounttext small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.accounttext b {
+    font-size: 11px
+}
+
+.accounttext small {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px
+}
+
+.iconbtn {
+    border: 0;
+    background: #f2f5fa;
+    padding: 7px;
+    border-radius: 7px
+}
+
+main {
+    margin-left: 238px;
+    max-width: 1600px;
+    padding: 33px 40px 22px
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 26px
+}
+
+.topbar h1 {
+    font: 800 28px Manrope;
+    margin: 7px 0 5px;
+    letter-spacing: -.7px
+}
+
+.topbar p,
+.sectionhead p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px
+}
+
+.live,
+.tag,
+.pill,
+.num {
+    border: 1px solid var(--line);
+    background: white;
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: #718097;
+    font-size: 10px;
+    font-weight: 700
+}
+
+.live {
+    color: #278b65
+}
+
+.card,
+.metric {
+    background: white;
+    border: 1px solid #e9edf4;
+    border-radius: 13px;
+    padding: 21px;
+    margin-bottom: 18px;
+    box-shadow: 0 3px 14px #192c4e08
+}
+
+.auth {
+    border-left: 3px solid #7392e5
+}
+
+.sectionhead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 17px
+}
+
+.sectionhead h2 {
+    font: 700 17px Manrope;
+    margin: 5px 0;
+    letter-spacing: -.2px
+}
+
+.num {
+    color: #9aabc3;
+    background: #f5f7fb
+}
+
+.authrow {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 12px;
+    align-items: end
+}
+
+.authrow label,
+.placeform label {
+    display: block;
+    color: #68778e;
+    font-size: 11px;
+    font-weight: 600
+}
+
+.authrow input,
+.placeform input {
+    width: 100%;
+    margin-top: 7px;
+    padding: 11px 12px;
+    border: 1px solid #e2e8f1;
+    border-radius: 8px;
+    background: #fbfcfe;
+    outline: none
+}
+
+.authrow input:focus,
+.placeform input:focus {
+    border-color: #8ba6ee;
+    box-shadow: 0 0 0 3px #edf2ff
+}
+
+.authbuttons {
+    display: flex;
+    gap: 8px
+}
+
+.btn {
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap
+}
+
+.btn:disabled {
+    opacity: .45;
+    cursor: not-allowed
+}
+
+.primary {
+    background: var(--blue);
+    color: white
+}
+
+.primary:hover:not(:disabled) {
+    background: #244cae
+}
+
+.light {
+    background: #f0f4fb;
+    color: #52647f
+}
+
+.danger {
+    background: #fff;
+    color: #c35b62;
+    border: 1px solid #f0d5d7
+}
+
+.full {
+    width: 100%
+}
+
+.notice {
+    margin-top: 12px;
+    padding: 9px 11px;
+    border-radius: 7px;
+    background: #f7f9fc;
+    color: #78859a;
+    font-size: 11px
+}
+
+.notice.error {
+    background: #fff3f2;
+    color: #b64f4b
+}
+
+.notice.success {
+    background: #effaf5;
+    color: #25855f
+}
+
+.hidden {
+    display: none !important
+}
+
+.spaced {
+    margin-top: 27px;
+    align-items: center
+}
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 13px;
+    margin-bottom: 19px
+}
+
+.metric {
+    padding: 16px 18px;
+    margin: 0;
+    min-width: 0
+}
+
+.metriclabel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #78859a;
+    font-size: 11px;
+    font-weight: 600
+}
+
+.bubble {
+    width: 29px;
+    height: 29px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    font-size: 15px
+}
+
+.blue {
+    background: #edf2ff;
+    color: #4168ce
+}
+
+.purple {
+    background: #f2efff;
+    color: #8064c8
+}
+
+.green {
+    background: #eaf8f1;
+    color: #29966b
+}
+
+.amber {
+    background: #fff6e8;
+    color: #c48b37
+}
+
+.metric strong {
+    display: block;
+    font: 800 25px Manrope;
+    margin: 12px 0 4px;
+    letter-spacing: -.6px
+}
+
+.metric .metrictext {
+    font-size: 17px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis
+}
+
+.metric small {
+    font-size: 10px;
+    color: #9aa5b5
+}
+
+.tracking {
+    padding: 18px 22px
+}
+
+.tracking .sectionhead {
+    align-items: center;
+    margin-bottom: 13px
+}
+
+.pill {
+    color: #8995a7;
+    background: #f5f7fa
+}
+
+.pill.active {
+    color: #25865e;
+    background: #eaf8f1
+}
+
+.trackrow {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap
+}
+
+.trackrow span {
+    font-size: 11px;
+    color: #8793a5;
+    margin-left: 5px
+}
+
+.twocol {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
+    gap: 17px;
+    align-items: stretch
+}
+
+.twocol .card {
+    min-width: 0
+}
+
+#map {
+    height: 355px;
+    width: 100%;
+    border-radius: 10px;
+    background: #edf1f6;
+    z-index: 1
+}
+
+.legend {
+    display: flex;
+    gap: 18px;
+    padding-top: 12px;
+    color: #8490a2;
+    font-size: 10px
+}
+
+.legend span:first-child {
+    color: #315fce
+}
+
+.placeform {
+    display: grid;
+    gap: 11px
+}
+
+.formrow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    align-items: end
+}
+
+.usecurrent {
+    height: 37px
+}
+
+.placeslist {
+    margin-top: 15px;
+    border-top: 1px solid var(--line);
+    padding-top: 8px
+}
+
+.placeitem {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 2px;
+    border-bottom: 1px solid #f0f2f6
+}
+
+.placesymbol {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: #eff3ff;
+    color: #5275ce;
+    display: grid;
+    place-items: center
+}
+
+.placeinfo {
+    flex: 1;
+    min-width: 0
+}
+
+.placeinfo b,
+.placeinfo small {
+    display: block
+}
+
+.placeinfo b {
+    font-size: 11px
+}
+
+.placeinfo small {
+    font-size: 10px;
+    color: #96a1b1;
+    margin-top: 3px
+}
+
+.deleteplace {
+    border: 0;
+    background: transparent;
+    color: #a4adba;
+    font-size: 18px
+}
+
+.empty {
+    color: #98a3b2;
+    font-size: 11px;
+    padding: 12px 2px
+}
+
+.tablewrap {
+    width: 100%;
+    overflow-x: auto
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 530px
+}
+
+th {
+    text-align: left;
+    font-size: 10px;
+    color: #98a3b2;
+    background: #fafbfd;
+    padding: 11px 12px
+}
+
+td {
+    padding: 12px;
+    font-size: 11px;
+    color: #617089;
+    border-top: 1px solid #eff2f6
+}
+
+.emptycell {
+    text-align: center;
+    color: #9aa5b4;
+    padding: 25px
+}
+
+.placename {
+    font-weight: 700;
+    color: #34445f
+}
+
+.visitlive {
+    color: #24875f;
+    font-weight: 700
+}
+
+.footnote {
+    font-size: 10px;
+    color: #9aa5b4;
+    margin: 13px 0 0
+}
+
+footer {
+    text-align: center;
+    color: #a0aaba;
+    font-size: 10px;
+    padding: 8px 0 20px
+}
+
+@media(max-width:1100px) {
+    .sidebar {
+        width: 205px
+    }
+
+    main {
+        margin-left: 205px;
+        padding: 27px 23px
+    }
+
+    .metrics {
+        grid-template-columns: repeat(2, 1fr)
+    }
+
+    .twocol {
+        grid-template-columns: 1fr
+    }
+}
+
+@media(max-width:700px) {
+    .sidebar {
+        position: static;
+        width: auto;
+        padding: 13px 15px;
+        border: 0;
+        border-bottom: 1px solid var(--line)
+    }
+
+    .brand {
+        padding: 0
+    }
+
+    .navtitle,
+    .nav,
+    .sidebottom {
+        display: none
+    }
+
+    main {
+        margin: 0;
+        padding: 22px 13px
+    }
+
+    .topbar h1 {
+        font-size: 23px
+    }
+
+    .authrow {
+        grid-template-columns: 1fr
+    }
+
+    .authbuttons .btn {
+        flex: 1
+    }
+
+    .metric {
+        padding: 13px
+    }
+
+    .metric strong {
+        font-size: 21px
+    }
+
+    .metric .metrictext {
+        font-size: 14px
+    }
+
+    #map {
+        height: 290px
+    }
+
+    .trackrow span {
+        width: 100%;
+        margin: 3px 0 0
+    }
+
+    .card {
+        padding: 16px
+    }
+
+    .formrow {
+        grid-template-columns: 1fr 1fr
+    }
+}

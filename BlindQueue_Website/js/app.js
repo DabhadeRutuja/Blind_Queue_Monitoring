@@ -1,177 +1,47 @@
-// STEP: Replace these two placeholders with your Supabase Project URL and publishable/anon key.
-  // Never put a service_role/secret key in a browser file.
-  const SUPABASE_URL = window.BLINDQUEUE_SUPABASE_URL || "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
-  const SUPABASE_KEY = window.BLINDQUEUE_SUPABASE_KEY || "PASTE_YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY_HERE";
-  const TABLE = "location_points";
-
-  const $ = (id) => document.getElementById(id);
-  const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("PASTE_") &&
-                     SUPABASE_KEY.length > 20 && !SUPABASE_KEY.includes("PASTE_");
-  let sb = null, currentUser = null, watchId = null, channel = null;
-  let marker = null, pathLine = null, map = null, positions = [];
-  let lastSentAt = 0, lastSavedPoint = null;
-
-  if (window.L) {
-    map = L.map('map').setView([18.5204, 73.8567], 12); // default view only; replace when GPS data arrives
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+(() => {
+  const $ = id => document.getElementById(id), URL = window.BLINDQUEUE_SUPABASE_URL || "", KEY = window.BLINDQUEUE_SUPABASE_KEY || "";
+  const POINTS = "location_points", PLACES = "saved_places";
+  const configured = URL.startsWith("https://") && !URL.includes("PASTE_") && KEY.length > 20 && !KEY.includes("PASTE_");
+  let sb = null, user = null, watchId = null, channel = null, map = null, marker = null, line = null, points = [], places = [], latest = null, lastUpload = 0;
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const status = (s, type = "") => { $("authStatus").textContent = s; $("authStatus").className = "notice " + type };
+  const tracking = s => $("trackingStatus").textContent = s;
+  const time = v => v ? new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+  const dateTime = v => v ? new Date(v).toLocaleString() : "—";
+  const today = v => new Date(v).toDateString() === new Date().toDateString();
+  const duration = ms => { let m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? m + " min" : Math.floor(m / 60) + " hr " + m % 60 + " min" };
+  function distance(a, b) { const r = n => n * Math.PI / 180, R = 6371000, dl = r(b.latitude - a.latitude), dn = r(b.longitude - a.longitude), x = Math.sin(dl / 2) ** 2 + Math.cos(r(a.latitude)) * Math.cos(r(b.latitude)) * Math.sin(dn / 2) ** 2; return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)) }
+  function coordinates(p) { return p.latitude !== null && p.latitude !== "" && p.longitude !== null && p.longitude !== "" && Number.isFinite(+p.latitude) && Number.isFinite(+p.longitude) && +p.latitude >= -90 && +p.latitude <= 90 && +p.longitude >= -180 && +p.longitude <= 180 }
+  function nearestPlace(p) { return places.map(q => ({ place: q, metres: distance(p, { latitude: +q.latitude, longitude: +q.longitude }) })).sort((a, b) => a.metres - b.metres)[0] || null }
+  function buttons() { let signed = !!user; $("loginBtn").classList.toggle("hidden", signed); $("signupBtn").classList.toggle("hidden", signed); $("logoutBtn").classList.toggle("hidden", !signed); $("startBtn").disabled = !signed || watchId !== null; $("stopBtn").disabled = watchId === null; $("refreshBtn").disabled = !signed; $("savePlaceBtn").disabled = !signed }
+  function initMap() { if (!window.L || map) return; map = L.map("map").setView([19, 75], 6); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map) }
+  function match(p) { if (!coordinates(p)) return null; let found = null, best = Infinity; for (const q of places) { let d = distance(p, { latitude: +q.latitude, longitude: +q.longitude }); if (d <= +(q.radius_m || 100) && d < best) { found = q; best = d } } return found }
+  function valid(list) { return list.filter(p => coordinates(p) && p.accuracy_m !== null && p.accuracy_m !== "" && Number.isFinite(+p.accuracy_m) && +p.accuracy_m >= 0 && +p.accuracy_m <= 100) }
+  function drawMap() { initMap(); let coords = points.slice().reverse().filter(coordinates).map(p => [+p.latitude, +p.longitude]); if (!map) return; if (!coords.length) { if (line) { line.remove(); line = null } if (marker) { marker.remove(); marker = null } return } if (line) line.remove(); line = L.polyline(coords, { color: "#5279d7", weight: 4, opacity: .8 }).addTo(map); let last = coords[coords.length - 1]; if (marker) marker.setLatLng(last); else marker = L.marker(last).addTo(map).bindPopup("Latest recorded location"); map.setView(last, 15); setTimeout(() => map.invalidateSize(), 100) }
+  function calcDistance() { let a = valid(points.filter(p => today(p.recorded_at))).reverse(), m = 0; for (let i = 1; i < a.length; i++) { let d = distance(a[i - 1], a[i]); if (d >= 10 && d <= 2000) m += d } return m >= 1000 ? (m / 1000).toFixed(2) + " km" : Math.round(m) + " m" }
+  function visits() {
+    let rows = valid(points.filter(p => today(p.recorded_at))).reverse(), groups = [], active = null, unknown = null; for (let p of rows) { let q = match(p), key = q ? "place-" + q.id : (unknown && distance(p, unknown.point) <= 150 ? unknown.key : "unknown-" + p.id), name = q ? q.name : "Unlabeled GPS location"; if (!q) unknown = { key, point: p }; else unknown = null; if (!active || active.key !== key) { active = { key, name, first: p.recorded_at, last: p.recorded_at, count: 1 }; groups.push(active) } else { active.last = p.recorded_at; active.count++ } }
+    let now = Date.now(); return groups.filter(v => v.count >= 2 && (new Date(v.last) - new Date(v.first) >= 240000 || v.key.startsWith("place-"))).map(v => ({ ...v, ongoing: groups[groups.length - 1] === v, duration: (groups[groups.length - 1] === v ? now : new Date(v.last).getTime()) - new Date(v.first).getTime() }))
   }
-
-  if (configured && window.supabase) {
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    $('authStatus').textContent = 'Supabase configuration loaded. Create an account or sign in.';
+  function render() {
+    let latestRows = points; if (latestRows.length && coordinates(latestRows[0])) { latest = latestRows[0]; let q = match(latest), nearest = nearestPlace(latest), coords = `${(+latest.latitude).toFixed(5)}, ${(+latest.longitude).toFixed(5)}`; $("currentPlaceValue").textContent = q ? q.name : "Unlabeled GPS location"; $("currentPlaceSub").textContent = q ? `Saved place · ${Math.round(distance(latest, { latitude: +q.latitude, longitude: +q.longitude }))} m from center · ${coords}` : nearest ? `Nearest saved place: ${nearest.place.name} (${Math.round(nearest.metres)} m away; ${+nearest.place.radius_m || 100} m radius) · ${coords}` : `No saved places yet. Add one below · GPS coordinates: ${coords}`; const accuracy = Number(latest.accuracy_m); $("accuracyValue").textContent = latest.accuracy_m !== null && latest.accuracy_m !== "" && Number.isFinite(accuracy) && accuracy >= 0 ? Math.round(accuracy) + " m" : "Unknown"; $("updatedValue").textContent = "Last update: " + time(latest.recorded_at) } else { latest = null; $("currentPlaceValue").textContent = "Waiting for GPS"; $("currentPlaceSub").textContent = latestRows.length ? "Latest GPS record has invalid coordinates" : "No recent location"; $("accuracyValue").textContent = "—"; $("updatedValue").textContent = "Last update: —" }
+    $("distanceValue").textContent = calcDistance(); let v = visits(); $("placesCountValue").textContent = new Set(v.filter(x => x.key.startsWith("place-")).map(x => x.key)).size;
+    $("historyBody").innerHTML = points.length ? points.slice(0, 30).map(p => `<tr><td>${esc(dateTime(p.recorded_at))}</td><td>${(+p.latitude).toFixed(6)}</td><td>${(+p.longitude).toFixed(6)}</td><td>${Math.round(+p.accuracy_m || 0)} m</td></tr>`).join("") : '<tr><td colspan="4" class="emptycell">No location records yet. Start tracking on the phone.</td></tr>';
+    $("visitsBody").innerHTML = v.length ? v.map(x => `<tr><td class="placename">${esc(x.name)}</td><td>${time(x.first)}</td><td>${x.ongoing ? "—" : time(x.last)}</td><td>${duration(x.duration)}</td><td class="${x.ongoing ? "visitlive" : ""}">${x.ongoing ? "Currently here" : "Completed"}</td></tr>`).join("") : '<tr><td colspan="5" class="emptycell">No confirmed visits yet. Keep GPS tracking active for a few minutes.</td></tr>'; drawMap()
   }
-
-  function setStatus(id, msg) { $(id).textContent = msg; }
-  function updateButtons() {
-    const signedIn = !!currentUser;
-    $('startBtn').disabled = !signedIn || watchId !== null;
-    $('stopBtn').disabled = watchId === null;
-    $('refreshBtn').disabled = !signedIn;
-    $('signupBtn').classList.toggle('hidden', signedIn);
-    $('loginBtn').classList.toggle('hidden', signedIn);
-    $('logoutBtn').classList.toggle('hidden', !signedIn);
-  }
-  function formatTime(v) {
-    if (!v) return '—';
-    return new Date(v).toLocaleString();
-  }
-  function haversine(a, b) {
-    const R = 6371000, rad = n => n * Math.PI / 180;
-    const dLat = rad(b.latitude - a.latitude), dLon = rad(b.longitude - a.longitude);
-    const x = Math.sin(dLat/2)**2 + Math.cos(rad(a.latitude))*Math.cos(rad(b.latitude))*Math.sin(dLon/2)**2;
-    return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
-  }
-  function updateMap(rows) {
-    positions = rows.slice().reverse().map(r => ({ latitude: Number(r.latitude), longitude: Number(r.longitude) }))
-      .filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
-    if (!map || positions.length === 0) return;
-    const latlngs = positions.map(p => [p.latitude, p.longitude]);
-    if (pathLine) pathLine.remove();
-    pathLine = L.polyline(latlngs, { color: '#1769d2', weight: 4 }).addTo(map);
-    const latest = positions[positions.length - 1];
-    if (marker) marker.setLatLng([latest.latitude, latest.longitude]);
-    else marker = L.marker([latest.latitude, latest.longitude]).addTo(map).bindPopup('Latest recorded location');
-    map.setView([latest.latitude, latest.longitude], Math.max(map.getZoom(), 15));
-    const today = new Date().toDateString();
-    const todays = rows.filter(r => new Date(r.recorded_at).toDateString() === today)
-      .slice().reverse().map(r => ({ latitude: Number(r.latitude), longitude: Number(r.longitude) }));
-    let metres = 0;
-    for (let i = 1; i < todays.length; i++) {
-      const d = haversine(todays[i-1], todays[i]);
-      // Ignore large GPS jumps that would badly distort the rough estimate.
-      if (d < 2000) metres += d;
-    }
-    $('distanceValue').textContent = metres >= 1000 ? (metres/1000).toFixed(2) + ' km' : Math.round(metres) + ' m';
-  }
-  function renderRows(rows) {
-    const body = $('historyBody');
-    if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="4">No location records yet. Start tracking on the phone.</td></tr>';
-      return;
-    }
-    body.innerHTML = rows.slice(0, 30).map(r =>
-      `<tr><td>${escapeHtml(formatTime(r.recorded_at))}</td><td>${Number(r.latitude).toFixed(6)}</td><td>${Number(r.longitude).toFixed(6)}</td><td>${Math.round(Number(r.accuracy_m) || 0)} m</td></tr>`
-    ).join('');
-    const latest = rows[0];
-    $('latValue').textContent = Number(latest.latitude).toFixed(6);
-    $('lonValue').textContent = Number(latest.longitude).toFixed(6);
-    $('accuracyValue').textContent = Math.round(Number(latest.accuracy_m) || 0) + ' m';
-    $('updatedValue').textContent = formatTime(latest.recorded_at);
-    updateMap(rows);
-  }
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-  async function loadHistory() {
-    if (!sb || !currentUser) return;
-    const { data, error } = await sb.from(TABLE).select('id, latitude, longitude, accuracy_m, recorded_at')
-      .eq('user_id', currentUser.id).order('recorded_at', { ascending: false }).limit(500);
-    if (error) { setStatus('trackingStatus', 'Could not load history: ' + error.message); return; }
-    renderRows(data || []);
-  }
-  function subscribeRealtime() {
-    if (!sb || !currentUser) return;
-    if (channel) sb.removeChannel(channel);
-    channel = sb.channel('location-live-' + currentUser.id)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLE, filter: 'user_id=eq.' + currentUser.id },
-        () => loadHistory())
-      .subscribe();
-  }
-  async function onSignedIn(user) {
-    currentUser = user;
-    setStatus('authStatus', 'Signed in as ' + user.email);
-    updateButtons();
-    await loadHistory();
-    subscribeRealtime();
-  }
-  $('signupBtn').onclick = async () => {
-    if (!sb) return setStatus('authStatus', 'First add your Supabase URL and publishable/anon key in the HTML file.');
-    const email = $('email').value.trim(), password = $('password').value;
-    if (!email || password.length < 6) return setStatus('authStatus', 'Enter a valid email and a password of at least 6 characters.');
-    const { data, error } = await sb.auth.signUp({ email, password });
-    if (error) return setStatus('authStatus', error.message);
-    if (data.session) await onSignedIn(data.user);
-    else setStatus('authStatus', 'Account created. Check your email to confirm it, then sign in.');
-  };
-  $('loginBtn').onclick = async () => {
-    if (!sb) return setStatus('authStatus', 'First add your Supabase URL and publishable/anon key in the HTML file.');
-    const { data, error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
-    if (error) return setStatus('authStatus', error.message);
-    await onSignedIn(data.user);
-  };
-  $('logoutBtn').onclick = async () => {
-    stopTracking();
-    if (channel) await sb.removeChannel(channel);
-    await sb.auth.signOut();
-    currentUser = null;
-    setStatus('authStatus', 'Signed out.');
-    updateButtons();
-  };
-  $('refreshBtn').onclick = loadHistory;
-
-  function stopTracking() {
-    if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-    updateButtons();
-    setStatus('trackingStatus', 'Tracking stopped.');
-  }
-  $('stopBtn').onclick = stopTracking;
-  $('startBtn').onclick = () => {
-    if (!currentUser) return;
-    if (!navigator.geolocation) return setStatus('trackingStatus', 'This browser does not support geolocation.');
-    if (!window.isSecureContext) return setStatus('trackingStatus', 'GPS needs HTTPS. Host this page on an HTTPS site, then reopen it on the phone.');
-    lastSentAt = 0;
-    setStatus('trackingStatus', 'Requesting GPS permission…');
-    watchId = navigator.geolocation.watchPosition(async (pos) => {
-      const now = Date.now();
-      setStatus('trackingStatus', `GPS active. Accuracy: about ${Math.round(pos.coords.accuracy)} m. Location uploads at most every 10 seconds.`);
-      if (now - lastSentAt < 10000) return;
-      lastSentAt = now;
-      const row = {
-        user_id: currentUser.id,
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        accuracy_m: pos.coords.accuracy,
-        recorded_at: new Date(pos.timestamp || now).toISOString()
-      };
-      const { error } = await sb.from(TABLE).insert(row);
-      if (error) setStatus('trackingStatus', 'GPS received, but database upload failed: ' + error.message);
-    }, (err) => {
-      setStatus('trackingStatus', 'GPS error: ' + err.message + '. Check phone location settings and browser permission.');
-      stopTracking();
-    }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
-    updateButtons();
-  };
-
-  async function initAuth() {
-    if (!sb) { updateButtons(); return; }
-    const { data } = await sb.auth.getSession();
-    if (data.session) await onSignedIn(data.session.user);
-    else updateButtons();
-    sb.auth.onAuthStateChange((_event, session) => {
-      if (session && (!currentUser || currentUser.id !== session.user.id)) onSignedIn(session.user);
-    });
-  }
-  initAuth();
+  async function loadPoints() { if (!sb || !user) return false; let { data, error } = await sb.from(POINTS).select("id,latitude,longitude,accuracy_m,recorded_at").eq("user_id", user.id).order("recorded_at", { ascending: false }).limit(2000); if (error) { tracking("Could not load location history: " + error.message); return false } points = data || []; render(); return true }
+  function renderPlaces() { $("placesList").innerHTML = places.length ? places.map(p => `<div class="placeitem"><span class="placesymbol">⌂</span><span class="placeinfo"><b>${esc(p.name)}</b><small>${+p.radius_m || 100} m radius · ${(+p.latitude).toFixed(4)}, ${(+p.longitude).toFixed(4)}</small></span><button class="deleteplace" data-id="${esc(p.id)}" title="Delete">×</button></div>`).join("") : '<div class="empty">No saved places yet. Add Home, Hospital or another place above.</div>'; document.querySelectorAll(".deleteplace").forEach(b => b.onclick = async () => { if (!confirm("Delete this saved place?")) return; let { error } = await sb.from(PLACES).delete().eq("id", b.dataset.id).eq("user_id", user.id); if (error) alert(error.message); else loadPlaces() }) }
+  async function loadPlaces() { let { data, error } = await sb.from(PLACES).select("id,name,latitude,longitude,radius_m,created_at").eq("user_id", user.id).order("created_at"); if (error) { $("placesList").textContent = "Could not load saved places: " + error.message + ". Check the saved_places table and its access policies."; return false } places = data || []; renderPlaces(); render(); return true }
+  async function signedIn(u) { if (user?.id === u.id) return; if (watchId !== null) stop(); if (channel) { await sb.removeChannel(channel); channel = null } user = u; points = []; places = []; latest = null; renderPlaces(); render(); $("accountLabel").textContent = u.email || "Signed in"; $("accountSub").textContent = "Connected account"; $("auth-section").classList.add("hidden"); buttons(); await loadPlaces(); if (await loadPoints()) tracking(points.length ? "Location history loaded. Connecting to live updates." : "No GPS records yet. Waiting for phone GPS and connecting to live updates."); channel = sb.channel("blindqueue-" + u.id).on("postgres_changes", { event: "INSERT", schema: "public", table: POINTS, filter: "user_id=eq." + u.id }, () => { void loadPoints() }).subscribe((state, error) => { if (state === "SUBSCRIBED") tracking(points.length ? "Live updates connected. Location history loaded." : "Live updates connected. Waiting for phone GPS."); else if (state === "CHANNEL_ERROR" || state === "TIMED_OUT") tracking("Live updates could not connect. Check your internet connection and that location_points is enabled in the Supabase supabase_realtime publication." + (error?.message ? " " + error.message : "")) }); status("Signed in successfully.", "success") }
+  $("signupBtn").onclick = async () => { if (!sb) return status("Set Supabase URL and key in js/config.js.", "error"); let email = $("email").value.trim(), password = $("password").value; if (!email || password.length < 6) return status("Enter email and a password of at least 6 characters.", "error"); let { data, error } = await sb.auth.signUp({ email, password }); if (error) return status(error.message, "error"); if (data.session) await signedIn(data.user); else status("Account created. Confirm your email, then sign in.", "success") };
+  $("loginBtn").onclick = async () => { if (!sb) return status("Set Supabase URL and key in js/config.js.", "error"); let { data, error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value }); if (error) return status(error.message, "error"); await signedIn(data.user) };
+  $("logoutBtn").onclick = async () => { stop(); if (channel) { await sb.removeChannel(channel); channel = null } let { error } = await sb.auth.signOut(); if (error) return status("Sign out failed: " + error.message, "error"); user = null; points = []; places = []; latest = null; renderPlaces(); render(); $("auth-section").classList.remove("hidden"); $("accountLabel").textContent = "Not signed in"; $("accountSub").textContent = "Connect your account"; buttons(); status("Signed out.") };
+  $("refreshBtn").onclick = async () => { await loadPlaces(); await loadPoints() };
+  $("useCurrentBtn").onclick = () => { if (!latest) return alert("No GPS location yet. Start tracking on the phone first."); $("placeLat").value = (+latest.latitude).toFixed(7); $("placeLon").value = (+latest.longitude).toFixed(7) };
+  $("placeForm").onsubmit = async e => { e.preventDefault(); let name = $("placeName").value.trim(), latitude = +$("placeLat").value, longitude = +$("placeLon").value, radius_m = +$("placeRadius").value; if (!name || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || radius_m < 30 || radius_m > 1000) return alert("Check place name, coordinates and radius (30–1000 m)."); let { error } = await sb.from(PLACES).insert({ user_id: user.id, name, latitude, longitude, radius_m }); if (error) return alert("Could not save place: " + error.message); $("placeForm").reset(); $("placeRadius").value = 100; await loadPlaces() };
+  function stop() { if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); watchId = null; buttons(); $("trackingPill").textContent = "● Not tracking"; $("trackingPill").classList.remove("active"); tracking("Tracking stopped.") }
+  $("stopBtn").onclick = stop;
+  $("startBtn").onclick = () => { if (!navigator.geolocation) return tracking("This browser does not support GPS."); if (!window.isSecureContext) return tracking("GPS requires HTTPS. Open the Vercel HTTPS address."); tracking("Requesting GPS permission…"); watchId = navigator.geolocation.watchPosition(async pos => { let now = Date.now(); $("trackingPill").textContent = "● Tracking active"; $("trackingPill").classList.add("active"); tracking("GPS active · Accuracy about " + Math.round(pos.coords.accuracy) + " m · Saving phone GPS updates."); latest = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy_m: pos.coords.accuracy }; $("placeLat").value = pos.coords.latitude.toFixed(7); $("placeLon").value = pos.coords.longitude.toFixed(7); if (now - lastUpload < 10000) return; lastUpload = now; let { error } = await sb.from(POINTS).insert({ user_id: user.id, latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy_m: pos.coords.accuracy, recorded_at: new Date(pos.timestamp || now).toISOString() }); if (error) tracking("GPS received but upload failed: " + error.message); else await loadPoints() }, err => { tracking("GPS error: " + err.message + ". Check phone location permission."); stop() }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }); buttons() };
+  $("todayLabel").textContent = new Date().toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" }); $("visitDateLabel").textContent = new Date().toLocaleDateString([], { day: "numeric", month: "short" }); initMap();
+  if (configured && window.supabase) { sb = window.supabase.createClient(URL, KEY); sb.auth.getSession().then(({ data }) => data.session ? signedIn(data.session.user) : buttons()); sb.auth.onAuthStateChange((_e, s) => { if (s && (!user || user.id !== s.user.id)) signedIn(s.user) }); status("Supabase client loaded. Sign in to continue.", "success") } else { status(configured ? "Could not load the Supabase client. Check your internet connection and refresh." : "Add Supabase URL and publishable/anon key in js/config.js before signing in.", "error"); buttons() }
+})();
