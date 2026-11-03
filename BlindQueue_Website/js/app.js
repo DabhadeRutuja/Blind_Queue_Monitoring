@@ -12,7 +12,7 @@
   const dateTime = v => v ? new Date(v).toLocaleString() : "—";
   const today = v => new Date(v).toDateString() === new Date().toDateString();
   const duration = ms => { let m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? m + " min" : Math.floor(m / 60) + " hr " + m % 60 + " min" };
-  const locationKey = p => `${(+p.latitude).toFixed(4)},${(+p.longitude).toFixed(4)}`;
+  const locationKey = p => `${(Math.round(+p.latitude * 2000) / 2000).toFixed(4)},${(Math.round(+p.longitude * 2000) / 2000).toFixed(4)}`;
   const lookupFor = p => locationLookups.get(locationKey(p));
   function distance(a, b) { const r = n => n * Math.PI / 180, R = 6371000, dl = r(b.latitude - a.latitude), dn = r(b.longitude - a.longitude), x = Math.sin(dl / 2) ** 2 + Math.cos(r(a.latitude)) * Math.cos(r(b.latitude)) * Math.sin(dn / 2) ** 2; return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)) }
   function coordinates(p) { return p.latitude !== null && p.latitude !== "" && p.longitude !== null && p.longitude !== "" && Number.isFinite(+p.latitude) && Number.isFinite(+p.longitude) && +p.latitude >= -90 && +p.latitude <= 90 && +p.longitude >= -180 && +p.longitude <= 180 }
@@ -58,14 +58,17 @@
       }
     }, delay);
   }
-  function requestLocationName(p) {
+  function requestLocationName(p, priority = false) {
     if (!user || !coordinates(p) || Number.isFinite(+p.accuracy_m) && +p.accuracy_m > 250) return;
     const key = locationKey(p), cached = locationLookups.get(key);
     if (cached && (!cached.error || Date.now() - cached.requestedAt < 300000) || queuedLocationKeys.has(key)) return;
+    if (!priority && geocodeQueue.length >= 10) return;
     const requestedAt = Date.now();
     locationLookups.set(key, { name: "", error: "", requestedAt });
     queuedLocationKeys.add(key);
-    geocodeQueue.push({ key, latitude: +p.latitude, longitude: +p.longitude, requestedAt });
+    const request = { key, latitude: +p.latitude, longitude: +p.longitude, requestedAt };
+    if (priority) geocodeQueue.unshift(request);
+    else geocodeQueue.push(request);
     processGeocodeQueue();
   }
   function clearLocationLookups() {
@@ -101,7 +104,7 @@
     if (latestRows.length && coordinates(latestRows[0])) {
       latest = latestRows[0];
       let q = match(latest), nearest = nearestPlace(latest), coords = `${(+latest.latitude).toFixed(5)}, ${(+latest.longitude).toFixed(5)}`, lookup = q ? null : lookupFor(latest), inaccurate = Number.isFinite(+latest.accuracy_m) && +latest.accuracy_m > 250;
-      if (!q) requestLocationName(latest);
+      if (!q) requestLocationName(latest, true);
       $("currentPlaceValue").textContent = q ? q.name : lookup?.name || (lookup?.error ? "Place name unavailable" : inaccurate ? "GPS accuracy too low" : "Finding nearby place…");
       $("currentPlaceSub").textContent = q
         ? `Saved place · ${Math.round(distance(latest, { latitude: +q.latitude, longitude: +q.longitude }))} m from center · ${coords}`
@@ -123,7 +126,7 @@
     $("distanceValue").textContent = calcDistance();
     let v = visits();
     $("placesCountValue").textContent = v.length;
-    v.filter(x => x.key.startsWith("unknown-")).slice(-10).forEach(requestLocationName);
+    v.filter(x => x.key.startsWith("unknown-")).slice(-10).forEach(x => requestLocationName(x));
     $("historyBody").innerHTML = points.length ? points.slice(0, 30).map(p => `<tr><td>${esc(dateTime(p.recorded_at))}</td><td>${(+p.latitude).toFixed(6)}</td><td>${(+p.longitude).toFixed(6)}</td><td>${Math.round(+p.accuracy_m || 0)} m</td></tr>`).join("") : '<tr><td colspan="4" class="emptycell">No location records yet. Start tracking on the phone.</td></tr>';
     $("visitsBody").innerHTML = v.length ? v.map(x => {
       const lookup = x.key.startsWith("unknown-") ? lookupFor(x) : null;
