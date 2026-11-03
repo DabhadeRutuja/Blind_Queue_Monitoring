@@ -2,6 +2,7 @@
   const $ = id => document.getElementById(id), URL = window.BLINDQUEUE_SUPABASE_URL || "", KEY = window.BLINDQUEUE_SUPABASE_KEY || "";
   const POINTS = "location_points", PLACES = "saved_places";
   const configured = URL.startsWith("https://") && !URL.includes("PASTE_") && KEY.length > 20 && !KEY.includes("PASTE_");
+  const knownLandmarks = [{ id: "avcoe", name: "Amrutvahini College of Engineering (AVCOE)", latitude: 19.6142, longitude: 74.1848, radius_m: 350 }];
   let sb = null, user = null, watchId = null, channel = null, map = null, marker = null, line = null, points = [], places = [], latest = null, lastUpload = 0;
   const locationLookups = new Map(), geocodeQueue = [], queuedLocationKeys = new Set();
   let geocodeTimer = null, lastGeocodeRequest = 0, geocodeGeneration = 0;
@@ -20,6 +21,8 @@
   function buttons() { let signed = !!user; $("loginBtn").classList.toggle("hidden", signed); $("signupBtn").classList.toggle("hidden", signed); $("logoutBtn").classList.toggle("hidden", !signed); $("startBtn").disabled = !signed || watchId !== null; $("stopBtn").disabled = watchId === null; $("refreshBtn").disabled = !signed; $("savePlaceBtn").disabled = !signed }
   function initMap() { if (!window.L || map) return; map = L.map("map").setView([19, 75], 6); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map) }
   function match(p) { if (!coordinates(p)) return null; let found = null, best = Infinity, accuracy = Number.isFinite(+p.accuracy_m) && +p.accuracy_m >= 0 ? Math.min(+p.accuracy_m, 100) : 0; for (const q of places) { let d = distance(p, { latitude: +q.latitude, longitude: +q.longitude }), radius = +(q.radius_m || 100); if (d <= radius + accuracy && d < best) { found = q; best = d } } return found }
+  function knownLandmark(p) { if (!coordinates(p)) return null; const accuracy = Number.isFinite(+p.accuracy_m) && +p.accuracy_m >= 0 ? Math.min(+p.accuracy_m, 100) : 0; return knownLandmarks.find(place => distance(p, place) <= place.radius_m + accuracy) || null }
+  function resolvedPlace(p) { return match(p) || knownLandmark(p) }
   function valid(list) { return list.filter(p => coordinates(p) && p.accuracy_m !== null && p.accuracy_m !== "" && Number.isFinite(+p.accuracy_m) && +p.accuracy_m >= 0 && +p.accuracy_m <= 100) }
   function visitPoints(list) { return list.filter(p => coordinates(p) && (p.accuracy_m === null || p.accuracy_m === "" || Number.isFinite(+p.accuracy_m) && +p.accuracy_m >= 0 && +p.accuracy_m <= 250)) }
   function nearbyName(result) {
@@ -79,12 +82,12 @@
     queuedLocationKeys.clear();
     locationLookups.clear();
   }
-  function drawMap() { initMap(); let coords = points.slice().reverse().filter(coordinates).map(p => [+p.latitude, +p.longitude]); if (!map) return; if (!coords.length) { if (line) { line.remove(); line = null } if (marker) { marker.remove(); marker = null } return } if (line) line.remove(); line = L.polyline(coords, { color: "#5279d7", weight: 4, opacity: .8 }).addTo(map); let last = coords[coords.length - 1]; if (marker) marker.setLatLng(last); else marker = L.marker(last).addTo(map).bindPopup("Latest recorded location"); map.setView(last, 15); setTimeout(() => map.invalidateSize(), 100) }
+  function drawMap() { initMap(); let coords = points.slice().reverse().filter(coordinates).map(p => [+p.latitude, +p.longitude]); if (!map) return; if (!coords.length) { if (line) { line.remove(); line = null } if (marker) { marker.remove(); marker = null } return } if (line) line.remove(); line = L.polyline(coords, { color: "#5279d7", weight: 4, opacity: .8 }).addTo(map); let last = coords[coords.length - 1], current = points.find(coordinates), saved = current && match(current), landmark = current && !saved && knownLandmark(current), nearby = current && lookupFor(current), label = saved?.name || landmark?.name || nearby?.name || "Current GPS location"; if (marker) marker.setLatLng(last); else marker = L.marker(last).addTo(map); marker.bindPopup(esc(label)); map.setView(last, 15); setTimeout(() => map.invalidateSize(), 100) }
   function calcDistance() { let a = valid(points.filter(p => today(p.recorded_at))).reverse(), m = 0; for (let i = 1; i < a.length; i++) { let d = distance(a[i - 1], a[i]); if (d >= 10 && d <= 2000) m += d } return m >= 1000 ? (m / 1000).toFixed(2) + " km" : Math.round(m) + " m" }
   function visits() {
     let rows = visitPoints(points.filter(p => today(p.recorded_at))).reverse(), groups = [], active = null, unknown = null;
     for (let p of rows) {
-      let q = match(p), key = q ? "place-" + q.id : (unknown && distance(p, unknown.point) <= 150 ? unknown.key : "unknown-" + p.id), name = q ? q.name : "Unlabeled GPS location";
+      let q = resolvedPlace(p), key = q ? "place-" + q.id : (unknown && distance(p, unknown.point) <= 150 ? unknown.key : "unknown-" + p.id), name = q ? q.name : "Unlabeled GPS location";
       if (!q) unknown = { key, point: p }; else unknown = null;
       let gap = active && new Date(p.recorded_at) - new Date(active.last) > 1800000;
       if (!active || active.key !== key || gap) {
@@ -103,11 +106,13 @@
     let latestRows = points;
     if (latestRows.length && coordinates(latestRows[0])) {
       latest = latestRows[0];
-      let q = match(latest), nearest = nearestPlace(latest), coords = `${(+latest.latitude).toFixed(5)}, ${(+latest.longitude).toFixed(5)}`, lookup = q ? null : lookupFor(latest), inaccurate = Number.isFinite(+latest.accuracy_m) && +latest.accuracy_m > 250;
-      if (!q) requestLocationName(latest, true);
-      $("currentPlaceValue").textContent = q ? q.name : lookup?.name || (lookup?.error ? "Place name unavailable" : inaccurate ? "GPS accuracy too low" : "Finding nearby place…");
+      let q = match(latest), landmark = q ? null : knownLandmark(latest), nearest = nearestPlace(latest), coords = `${(+latest.latitude).toFixed(5)}, ${(+latest.longitude).toFixed(5)}`, lookup = q || landmark ? null : lookupFor(latest), inaccurate = Number.isFinite(+latest.accuracy_m) && +latest.accuracy_m > 250;
+      if (!q && !landmark) requestLocationName(latest, true);
+      $("currentPlaceValue").textContent = q?.name || landmark?.name || lookup?.name || (lookup?.error ? "Place name unavailable" : inaccurate ? "GPS accuracy too low" : "Finding nearby place…");
       $("currentPlaceSub").textContent = q
         ? `Saved place · ${Math.round(distance(latest, { latitude: +q.latitude, longitude: +q.longitude }))} m from center · ${coords}`
+        : landmark
+          ? `Campus area · ${Math.round(distance(latest, landmark))} m from AVCOE pin · ${coords}`
         : lookup?.error
           ? `Could not find a nearby name (${lookup.error}) · GPS: ${coords}`
           : inaccurate

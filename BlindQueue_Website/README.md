@@ -25,6 +25,7 @@ BLINDQUEUE DASHBOARD SETUP
 
 Sustained unlabeled stops now appear in Today's visits with their average coordinates. Select Save as place, enter a recognizable name, and save it; the dashboard will then match recorded visits to that name. GPS by itself cannot infer a place's real-world name.
    The dashboard also looks up a nearby OpenStreetMap name automatically for the current location and the latest 10 unlabeled visits. It refreshes the current lookup as the phone moves about 50 metres and prioritizes the newest position ahead of older visit lookups. This sends those GPS coordinates to the public Nominatim service, caches results in the active page, and limits requests to less than one per second. Names depend on map coverage and can be approximate; see the linked Nominatim policy in the dashboard.
+   The provided coordinates for Amrutvahini College of Engineering (19.6142, 74.1848) are recognized as AVCOE within a 350-metre campus area in the dashboard. This local label does not add or modify public OpenStreetMap data.
 
 LIMITATIONS
 - Browser watchPosition is not guaranteed to continue when the screen locks, browser closes, or Android suspends the page. Reliable all-day background tracking needs a native Android app with background location permission.
