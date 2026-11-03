@@ -24,6 +24,7 @@ BLINDQUEUE DASHBOARD SETUP
 8. To register Home/Hospital/XYZ: stand at the place, enter its name, press Use current GPS, then Save place. The radius defaults to 100 metres and can be changed. “Unlabeled GPS location” means the phone's GPS fix is available but is not inside a saved place radius; the dashboard shows coordinates and the nearest saved place so you can label it.
 
 Sustained unlabeled stops now appear in Today's visits with their average coordinates. Select Save as place, enter a recognizable name, and save it; the dashboard will then match recorded visits to that name. GPS by itself cannot infer a place's real-world name.
+   The dashboard also looks up a nearby OpenStreetMap name automatically for the current location and the latest 10 unlabeled visits. This sends those GPS coordinates to the public Nominatim service, caches results in the active page, and limits requests to less than one per second. Names depend on map coverage and can be approximate; see the linked Nominatim policy in the dashboard.
 
 LIMITATIONS
 - Browser watchPosition is not guaranteed to continue when the screen locks, browser closes, or Android suspends the page. Reliable all-day background tracking needs a native Android app with background location permission.

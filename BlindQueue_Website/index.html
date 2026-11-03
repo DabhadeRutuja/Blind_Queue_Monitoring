@@ -93,6 +93,7 @@
         <div class="trackrow"><button id="startBtn" class="btn primary" disabled>▶ Start GPS tracking</button><button
             id="stopBtn" class="btn danger" disabled>■ Stop tracking</button><span id="trackingStatus">Sign in, then
             start GPS tracking from the phone.</span></div>
+        <p class="footnote">Nearby names are looked up with OpenStreetMap; GPS coordinates are sent to its public service. Names may be approximate.</p>
       </section>
       <div class="twocol">
         <section class="card" id="map-section">
@@ -183,7 +184,7 @@
           </table>
         </div>
       </section>
-      <footer>BlindQueue · Location data is sensitive. Keep account access limited to authorized people.</footer>
+      <footer>BlindQueue · Nearby place names use OpenStreetMap. GPS coordinates are sent to its public lookup service, and returned names may be approximate. <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>. <a href="https://operations.osmfoundation.org/policies/nominatim/" target="_blank" rel="noopener noreferrer">Lookup policy</a>. Location data is sensitive; share dashboard access only with authorized people.</footer>
     </main>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
